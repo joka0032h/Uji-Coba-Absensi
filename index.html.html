@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Aplikasi Absensi Karyawan Modern</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin: 0; background:rgb(138, 61, 44);}
+    .container { max-width: 400px; margin: 40px auto; background: #73d353; border-radius: 10px; box-shadow: 0 2px 15px #bbb5; padding: 24px; }
+    h2 { text-align: center; margin-bottom: 18px;}
+    .form-group { margin-bottom: 12px;}
+    label { display: block; margin-bottom: 4px; font-weight: 500;}
+    input[type=text], input[type=password] { width: 100%; padding: 8px; border: 1px solid #dce3ea; border-radius: 6px;}
+    button { background: #0078d7; color: #fff; border: none; border-radius: 7px; padding: 8px 20px; cursor: pointer; font-weight: 500; transition: background .2s;}
+    button:hover { background: #005fa3;}
+    #logoutBtn { background: #d83b01;}
+    #logoutBtn:hover { background: #b21a0e;}
+    .button-group { display: flex; gap: 10px; margin-bottom: 16px;}
+    #welcome { margin-bottom: 16px; font-size: 1.05em; text-align: center;}
+    .fade { animation: fadeIn .6s;}
+    @keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
+    .notif { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 1000;
+      background: #0078d7; color: #fff; border-radius: 6px; padding: 10px 22px; box-shadow: 0 2px 8px #0003; font-weight: 500;
+      opacity: 0; pointer-events: none; transition: opacity .4s; }
+    .notif.show { opacity: 1; pointer-events: all;}
+    table { border-collapse: collapse; width: 100%; margin-top: 18px;}
+    th, td { border: 1px solid #e3e7ee; padding: 7px; text-align: center;}
+    th { background: #e9f2fb;}
+    @media (max-width: 600px) {
+      .container { max-width: 98vw; padding: 12px;}
+      table, th, td { font-size: .98em;}
+    }
+    .tools { margin: 8px 0;}
+    .tools button { background: #15b374; }
+    .tools button:hover { background: #0c814e; }
+  </style>
+</head>
+<body>
+  <div class="notif" id="notif"></div>
+  <div class="container fade" id="loginSection">
+    <h2>Absensi Karyawan Kantor</h2>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit">Login</button>
+    </form>
+    <div style="margin-top:20px;font-size:.97em;color:#666;text-align:center;">
+    </div>
+  </div>
+
+  <div class="container fade" id="mainSection" style="display:none;">
+    <div id="welcome"></div>
+    <div class="button-group">
+      <button id="logoutBtn">Logout</button>
+      <button onclick="absen('masuk')">Absen Masuk</button>
+      <button onclick="absen('pulang')">Absen Pulang</button>
+    </div>
+    <div class="tools">
+      <button onclick="exportCSV()">Export Absensi CSV</button>
+    </div>
+    <h3 style="margin-bottom:10px;margin-top:18px;">Rekap Absensi</h3>
+    <table id="tabelAbsensi">
+      <thead>
+        <tr>
+          <th>Nama</th>
+          <th>Tanggal</th>
+          <th>Jam Masuk</th>
+          <th>Jam Pulang</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Data absensi akan muncul di sini -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // Demo user
+    const users = [
+      { username: 'Joka Misbakhul Munir', password: 'Joka2004' },
+      { username: 'Nur Izzati Kharisma', password: 'Kharisma2006' }
+    ];
+    let loggedInUser = null;
+    let absensi = JSON.parse(localStorage.getItem('absensi') || '[]');
+
+    // Animasi notifikasi
+    function showNotif(msg, type='info', timeout=1800) {
+      const n = document.getElementById('notif');
+      n.innerText = msg;
+      n.className = 'notif show fade';
+      n.style.background = type === 'error' ? '#d83b01' : '#0078d7';
+      setTimeout(() => { n.className = 'notif'; }, timeout);
+    }
+
+    // Login section
+    function showLogin() {
+      document.getElementById('loginSection').style.display = '';
+      document.getElementById('mainSection').style.display = 'none';
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('loginSection').classList.add('fade');
+      document.getElementById('mainSection').classList.remove('fade');
+    }
+    function showMain(username) {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('mainSection').style.display = '';
+      document.getElementById('welcome').innerText = 'Selamat datang, ' + username;
+      document.getElementById('mainSection').classList.add('fade');
+      document.getElementById('loginSection').classList.remove('fade');
+      tampilkanAbsensi();
+    }
+
+    document.getElementById('loginForm').onsubmit = function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const user = users.find(u => u.username === username && u.password === password);
+      if (user) {
+        loggedInUser = username;
+        showMain(username);
+        showNotif("Login sukses!", "info",1200);
+      } else {
+        showNotif("Username atau password salah!", "error",1800);
+      }
+    };
+
+    document.getElementById('logoutBtn').onclick = function() {
+      loggedInUser = null;
+      showLogin();
+      showNotif("Logout berhasil", "info",1100);
+    };
+
+    // Absen
+    function absen(tipe) {
+      if (!loggedInUser) {
+        showNotif("Anda belum login!", "error",1500);
+        return;
+      }
+      const tgl = new Date().toISOString().slice(0, 10);
+      const jamSekarang = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      let data = absensi.find(item => item.username === loggedInUser && item.tgl === tgl);
+
+      if (tipe === 'masuk') {
+        if (data) {
+          showNotif("Sudah absen masuk hari ini!", "error",1400);
+          return;
+        }
+        absensi.push({ username: loggedInUser, tgl, masuk: jamSekarang, pulang: '' });
+        showNotif("Berhasil absen masuk!", "info",1300);
+      } else if (tipe === 'pulang') {
+        if (!data) {
+          showNotif("Belum absen masuk hari ini!", "error",1400);
+          return;
+        }
+        if (data.pulang) {
+          showNotif("Sudah absen pulang hari ini!", "error",1400);
+          return;
+        }
+        data.pulang = jamSekarang;
+        showNotif("Berhasil absen pulang!", "info",1300);
+      }
+      localStorage.setItem('absensi', JSON.stringify(absensi));
+      tampilkanAbsensi();
+    }
+
+    // Tabel absensi
+    function tampilkanAbsensi() {
+      const tbody = document.querySelector('#tabelAbsensi tbody');
+      tbody.innerHTML = '';
+      absensi.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.username}</td>
+          <td>${item.tgl}</td>
+          <td>${item.masuk}</td>
+          <td>${item.pulang}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Export CSV
+    function exportCSV() {
+      if (absensi.length === 0) {
+        showNotif("Data absensi kosong!", "error");
+        return;
+      }
+      const header = ['Nama','Tanggal','Jam Masuk','Jam Pulang'];
+      const rows = absensi.map(a=>[a.username,a.tgl,a.masuk,a.pulang]);
+      let csv = header.join(',') + '\n' + rows.map(r=>r.join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'absensi.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showNotif("Data absensi diexport!", "info",1400);
+    }
+
+    // Inisialisasi: Tampilkan login form
+    window.onload = function() {
+      showLogin();
+    };
+  </script>
+</body>
+</html>
